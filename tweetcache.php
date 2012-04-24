@@ -14,7 +14,7 @@ class TweetCache {
 		if (!preg_match('/^\w+$/', $username))
 			throw new Exception("Username not accepted.");
 
-		if (!in_array($format, array('atom', 'xml', 'rss')))
+		if (!in_array($format, array('atom', 'xml', 'rss', 'json')))
 			throw new Exception("Feed format not accepted");
 
 		$this->config = $config;
@@ -39,8 +39,13 @@ class TweetCache {
 		if ($stale || !$this->stat['size']) {
 			if (flock($cache, LOCK_EX|LOCK_NB)) {
 				try {
-					$xmldom = $this->loadFromTwitter();
-					$this->feed = $xmldom->saveXML($xmldom->documentElement);
+					$this->feed = $this->loadFromTwitter();
+					if ($this->format!='json') {
+						$xml = new DomDocument();
+						$xml->loadXML($this->feed);
+						#$this->filterTweets($xml);
+						$this->feed = $xml->saveXML($xml->documentElement);
+					}
 					$this->lastmod = time();
 					$this->log("Writing to cache");
 					ftruncate($cache, 0);
@@ -75,7 +80,7 @@ class TweetCache {
 		if (in_array($this->format, array('atom', 'rss')))
 			$mimetype .= $this->format . '+xml';
 		else
-			$mimetype .= 'xml';
+			$mimetype .= $this->format;
 		return $mimetype; 
 	}
 	
@@ -98,13 +103,15 @@ class TweetCache {
 		$paramfile = $this->config['cache']['path'].'/' . $this->username . '/params.ini';
 		if (file_exists($paramfile))
 			$params = array_merge($params, parse_ini_file($paramfile));
+		if (in_array($this->format, array('atom', 'rss'))) {
+			unset($params['trim_user']);
+			unset($params['include_rts']);
+		}
 		$tweets = $connection->get('statuses/user_timeline', $params);
 		$hc = $connection->http_code;
 		if ($hc != 200)
 			throw new Exception("Fail Whale: HTTP " . ($hc?$hc:'timeout') . ' (after ' . (time() - $start) . ' seconds)', $hc);
-		$xml = new DomDocument();
-		$xml->loadXML($tweets);
-		return $xml;
+		return $tweets;
 	}
 	
 	function toString() {

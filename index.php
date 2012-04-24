@@ -1,6 +1,8 @@
 <?php
 require('tweetcache.php');
 
+#function json_decode($s) { return $s; }
+
 try {
 	$config = parse_ini_file("tweetcache.ini", true);
 	$username = '';
@@ -29,8 +31,10 @@ try {
 		header('Last-Modified: ' . gmstrftime("%A %d-%b-%y %T %Z", $tweets->modified()));
 		header('Expires: ' . gmstrftime("%A %d-%b-%y %T %Z", $now + $max_age));
 		header('Cache-control: public,max-age=' . $max_age);
-		echo '<' . '?xml version="1.0" encoding="utf-8" ?' . ">\n";
-		echo "<!--\n\t" . $tweets->getLog("\n\t") . "\n-->\n";
+		if ($format != 'json') {
+			echo '<' . '?xml version="1.0" encoding="utf-8" ?' . ">\n";
+			echo "<!--\n\t" . $tweets->getLog("\n\t") . "\n-->\n";
+		}
 		echo $tweets->toString() . "\n";
 	}
 } catch(Exception $ex) {

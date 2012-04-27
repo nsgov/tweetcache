@@ -1,8 +1,6 @@
 <?php
 require('tweetcache.php');
 
-#function json_decode($s) { return $s; }
-
 try {
 	$config = parse_ini_file("tweetcache.ini", true);
 	$username = '';
@@ -13,7 +11,7 @@ try {
 		if (!preg_match('/^\w+$/', $username))
 			$bad[] = "Twitter username not accepted.";
 	} else
-		$bad[] = 'No twitter name given.';
+		$bad[] = 'No twitter username given.';
 	if (isset($_GET['format']))
 		$format = $_GET['format'];
 	if (!in_array($format, array('atom', 'xml', 'rss')))
@@ -23,6 +21,8 @@ try {
 		header("Status: 400 Bad Request");
 		echo "<ul>\n\t<li>" . join("</li>\n\t<li>", $bad) . "</li>\n</ul>\n";
 	} else {
+		if (isset($config['cache']['timezone']))
+			date_default_timezone_set($config['cache']['timezone']);
 		$tweets = new TweetCache($config, $username, $format);
 		$tweets->load();
 		$now = time();

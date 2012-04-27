@@ -44,6 +44,7 @@ class TweetCache {
 						$xml = new DomDocument();
 						$xml->loadXML($this->feed);
 						#$this->filterTweets($xml);
+						$this->convertToLocalTime($xml);
 						$this->feed = $xml->saveXML($xml->documentElement);
 					}
 					$this->lastmod = time();
@@ -112,6 +113,50 @@ class TweetCache {
 		if ($hc != 200)
 			throw new Exception("Fail Whale: HTTP " . ($hc?$hc:'timeout') . ' (after ' . (time() - $start) . ' seconds)', $hc);
 		return $tweets;
+	}
+
+	function convertToLocalTime($xml) {
+		$months = array('Jan'=>1, 'Feb'=>2, 'Mar'=>3, 'Apr'=>4, 'May'=>5, 'Jun'=>6,
+						'Jul'=>7, 'Aug'=>8, 'Sep'=>9, 'Oct'=>10, 'Nov'=>11, 'Dec'=>12);
+		$this->log('Converting timestamps to ' . $this->config['cache']['timezone'] . ' timezone');
+		switch ($this->format) {
+			case 'atom':
+				foreach (array('published', 'updated') as $tagname) {
+					$tags = $xml->getElementsByTagNameNS('http://www.w3.org/2005/Atom', $tagname);
+					for ($n = $tags->length; $n--;) {
+						$tag = $tags->item($n);
+						if (preg_match_all('/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[-+]00:00$/', $tag->textContent, $d)) {
+							$t = gmmktime($d[4][0],$d[5][0],$d[6][0],$d[2][0],$d[3][0],$d[1][0]);
+							$tag->removeChild($tag->firstChild);
+							$tag->appendChild($xml->createTextNode(date(DATE_W3C, $t)));
+						}
+					}
+				}
+				break;
+			case 'rss':
+				$tags = $xml->getElementsByTagName('pubDate');
+				for ($n = $tags->length; $n--;) {
+					$tag = $tags->item($n);
+					if (preg_match_all('/^\w+, (\d+) (\w+) (\d+)\s+(\d+):(\d+):(\d+)\s+[-+]0000$/', $tag->textContent, $d)) {
+						$t = gmmktime($d[4][0],$d[5][0],$d[6][0],$months[$d[2][0]],$d[1][0],$d[3][0]);
+						$tag->removeChild($tag->firstChild);
+						$tag->appendChild($xml->createTextNode(date('D, d M Y H:i:s O', $t)));
+					}
+				}
+				break;
+			case 'xml':
+				$tags = $xml->getElementsByTagName('created_at');
+				for ($n = $tags->length; $n--;) {
+					$tag = $tags->item($n);
+					if (preg_match_all('/^\w+ (\w+) (\d+)\s+(\d+):(\d+):(\d+)\s+[-+]0000\s+(\d+)$/', $tag->textContent, $d)) {
+						$t = gmmktime($d[3][0],$d[4][0],$d[5][0],$months[$d[1][0]],$d[2][0],$d[6][0]);
+						$tag->removeChild($tag->firstChild);
+						$tag->appendChild($xml->createTextNode(date('D M d H:i:s O Y', $t)));
+					}
+				}
+				break;
+			default: break;
+		}
 	}
 	
 	function toString() {

@@ -47,10 +47,14 @@ class TweetCache {
 						$this->convertToLocalTime($xml);
 						$this->feed = $xml->saveXML($xml->documentElement);
 					}
-					$this->lastmod = time();
-					$this->log("Writing to cache");
-					ftruncate($cache, 0);
-					fwrite($cache, $this->feed, strlen($this->feed));
+					$len = strlen($this->feed);
+					if ($len) {
+						$this->lastmod = time();
+						$this->log("Writing to cache");
+						ftruncate($cache, 0);
+						fwrite($cache, $this->feed, $len);
+					} else
+						$this->log("Received empty feed");
 				} catch(Exception $ex) {
 					$this->log($ex->getMessage());
 				}
@@ -97,7 +101,7 @@ class TweetCache {
 		$connection->format = $this->format;
 		$params = array(
 			'screen_name'=>$this->username,
-			'trim_user'=>1,
+		#	'trim_user'=>1,
 			'include_entities'=>0,
 			'include_rts'=>0
 		);
